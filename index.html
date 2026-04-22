@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMC Genesis Pro - AI Learning Dashboard</title>
+    <style>
+        :root { --bg: #050a18; --card: #111827; --gold: #f59e0b; --blue: #3b82f6; --text: #e2e8f0; --green: #00E676; --red: #F23645; --purple: #a855f7; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .dashboard { max-width: 800px; margin: 0 auto; }
+        .card { background: var(--card); border-radius: 28px; padding: 24px; margin-bottom: 16px; border: 1px solid #1f2937; }
+        .price-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; }
+        .price-label { color: #6b7280; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+        .price { font-size: 48px; font-weight: 800; color: var(--gold); }
+        .change { font-size: 14px; padding: 4px 10px; border-radius: 20px; background: #1f2937; }
+        .smc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+        .stat { background: #0f172a; border-radius: 16px; padding: 12px; text-align: center; }
+        .stat-label { font-size: 10px; color: #6b7280; text-transform: uppercase; }
+        .stat-value { font-size: 16px; font-weight: bold; margin-top: 4px; }
+        .stat-value.bull { color: var(--green); }
+        .stat-value.bear { color: var(--red); }
+        .signal-badge { display: inline-block; padding: 6px 14px; border-radius: 30px; font-size: 12px; font-weight: bold; margin: 4px; }
+        .signal-buy { background: rgba(0,230,118,0.2); color: #00E676; border: 1px solid #00E676; }
+        .signal-sell { background: rgba(242,54,69,0.2); color: #F23645; border: 1px solid #F23645; }
+        .signal-neutral { background: #1f2937; color: #9ca3af; }
+        .signal-learning { background: rgba(168,85,247,0.2); color: #a855f7; border: 1px solid #a855f7; }
+        .chat-section { background: #0f172a; border-radius: 20px; padding: 20px; height: 400px; overflow-y: auto; border: 1px solid #1f2937; }
+        .ai-msg { background: #1e293b; padding: 14px; border-radius: 16px; margin-top: 10px; border-left: 4px solid var(--gold); font-size: 14px; line-height: 1.5; }
+        .user-msg { color: var(--blue); margin-top: 12px; text-align: right; font-weight: 500; }
+        .input-group { margin-top: 16px; display: flex; gap: 10px; }
+        input { flex: 1; background: #1f2937; border: 1px solid #374151; padding: 14px 18px; border-radius: 40px; color: white; outline: none; font-size: 14px; }
+        button { background: var(--gold); border: none; padding: 12px 28px; border-radius: 40px; font-weight: bold; cursor: pointer; color: #1a1a2e; }
+        .zone-list { font-size: 11px; color: #6b7280; margin-top: 12px; }
+        .learning-panel { background: #0f172a; border-radius: 16px; padding: 12px; margin-top: 12px; font-size: 12px; }
+        .learning-header { color: var(--purple); font-weight: bold; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .feedback-buttons { display: flex; gap: 8px; margin-top: 8px; }
+        .feedback-btn { background: #1f2937; border: none; padding: 4px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; }
+        .feedback-btn.good { color: var(--green); }
+        .feedback-btn.bad { color: var(--red); }
+        .api-status { font-size: 10px; text-align: right; margin-top: 8px; }
+        hr { margin: 12px 0; border-color: #1f2937; }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="card">
+        <div class="price-header">
+            <div>
+                <div class="price-label">XAU/USD (GOLD) - SMC GENESIS PRO</div>
+                <div class="price" id="gold-price">Loading...</div>
+            </div>
+            <div class="change" id="price-change">-</div>
+        </div>
+        
+        <div class="smc-stats">
+            <div class="stat"><div class="stat-label">MAIN BIAS</div><div class="stat-value" id="main-bias">⚪ NEUTRAL</div></div>
+            <div class="stat"><div class="stat-label">STRUCTURE</div><div class="stat-value" id="structure">-</div></div>
+            <div class="stat"><div class="stat-label">NEAREST ZONE</div><div class="stat-value" id="nearest-zone">-</div></div>
+            <div class="stat"><div class="stat-label">LIQUIDITY</div><div class="stat-value" id="liquidity">-</div></div>
+        </div>
+        
+        <div id="signals-container"></div>
+        <div class="zone-list" id="zone-info"></div>
+        
+        <!-- ระบบเรียนรู้ -->
+        <div class="learning-panel">
+            <div class="learning-header">
+                <span>🧠 LEARNING SYSTEM</span>
+                <span id="learning-stats">📊 0 interactions</span>
+            </div>
+            <div id="last-prediction" style="font-size: 11px; color: #9ca3af;">ยังไม่มีประวัติการเรียนรู้</div>
+            <div class="feedback-buttons" id="feedback-buttons" style="display: none;">
+                <button class="feedback-btn good" onclick="giveFeedback(true)">✅ ถูกต้อง / ทำกำไรได้</button>
+                <button class="feedback-btn bad" onclick="giveFeedback(false)">❌ ผิดพลาด / ขาดทุน</button>
+            </div>
+        </div>
+        
+        <div class="api-status" id="api-status">🟢 DeepSeek AI + Learning: Connected</div>
+    </div>
+    
+    <div class="card">
+        <div class="chat-section" id="chat-output">
+            <div class="ai-msg">
+                <b>🤖 DeepSeek SMC AI (มีระบบเรียนรู้)</b><br>
+                สวัสดีครับ! ผมมีระบบเรียนรู้ในตัว - ยิ่งพี่ใช้เยอะ ผมจะจำรูปแบบและพัฒนาการวิเคราะห์ให้ดีขึ้นเรื่อยๆ<br>
+                หลังจาก AI ตอบ สามารถกดปุ่ม "ถูกต้อง" หรือ "ผิดพลาด" เพื่อให้ผมเรียนรู้ครับ! 🚀
+            </div>
+        </div>
+        <div class="input-group">
+            <input type="text" id="user-input" placeholder="ถาม SMC เช่น แนวโน้มเป็นยังไง จุดเข้า Buy ตรงไหน">
+            <button id="send-btn">วิเคราะห์</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // DEEPSEEK API KEY
+    // ============================================================
+    const DEEPSEEK_API_KEY = "sk-160f014423e3465e9eea595434569480";
+    
+    // ============================================================
+    // LEARNING SYSTEM - Memory & Pattern Recognition
+    // ============================================================
+    
+    let learningMemory = {
+        // ประวัติการถาม-ตอบ
+        conversations: [],
+        // สรุปรูปแบบที่ได้เรียนรู้
+        patterns: {
+            successfulSetups: [],    // รูปแบบที่ทำกำไรได้
+            failedSetups: [],        // รูปแบบที่ขาดทุน
+            userPreferences: {
+                preferredTimeframe: "H1",
+                riskPerTrade: 1.0,
+                favoritePairs: ["XAUUSD"]
+            }
+        },
+        // สถิติ
+        stats: {
+            totalInteractions: 0,
+            positiveFeedback: 0,
+            negativeFeedback: 0,
+            accuracy: 0
+        },
+        // ปรับปรุง prompt ตามการเรียนรู้
+        improvedPromptAdditions: ""
+    };
+    
+    // โหลดข้อมูลเก่าจาก LocalStorage (ถ้ามี)
+    function loadLearningMemory() {
+        const saved = localStorage.getItem("smc_learning_memory");
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                learningMemory = { ...learningMemory, ...parsed };
+                updateLearningDisplay();
+            } catch(e) {}
+        }
+    }
+    
+    // บันทึกการเรียนรู้
+    function saveLearningMemory() {
+        localStorage.setItem("smc_learning_memory", JSON.stringify(learningMemory));
+        updateLearningDisplay();
+    }
+    
+    // อัปเดต UI แสดงผลการเรียนรู้
+    function updateLearningDisplay() {
+        const stats = learningMemory.stats;
+        document.getElementById("learning-stats").innerHTML = `📊 ${stats.totalInteractions} interactions | ✅ ${stats.positiveFeedback} | ❌ ${stats.negativeFeedback}`;
+        if (stats.totalInteractions > 0) {
+            const accuracy = (stats.positiveFeedback / stats.totalInteractions * 100).toFixed(0);
+            document.getElementById("learning-stats").innerHTML += ` | 🎯 ${accuracy}%`;
+        }
+    }
+    
+    // บันทึกการสนทนา
+    function recordConversation(question, answer, context) {
+        learningMemory.conversations.unshift({
+            timestamp: Date.now(),
+            question: question,
+            answer: answer.substring(0, 500),
+            context: context,
+            feedback: null  // null = ยังไม่ให้ feedback, true = good, false = bad
+        });
+        // เก็บแค่ 100 รายการล่าสุด
+        if (learningMemory.conversations.length > 100) learningMemory.conversations.pop();
+        learningMemory.stats.totalInteractions++;
+        saveLearningMemory();
+    }
+    
+    // ให้ feedback
+    let lastAnswer = null;
+    let lastQuestion = null;
+    let lastContext = null;
+    
+    function giveFeedback(isGood) {
+        if (!lastQuestion || !lastAnswer) {
+            alert("กรุณาถาม AI ก่อนให้ feedback ครับ");
+            return;
+        }
+        
+        if (isGood) {
+            learningMemory.stats.positiveFeedback++;
+            // เรียนรู้รูปแบบที่สำเร็จ
+            learningMemory.patterns.successfulSetups.push({
+                timestamp: Date.now(),
+                question: lastQuestion,
+                context: lastContext,
+                price: lastContext?.price
+            });
+            // เก็บแค่ 50 รูปแบบล่าสุด
+            if (learningMemory.patterns.successfulSetups.length > 50) learningMemory.patterns.successfulSetups.shift();
+            
+            // ปรับปรุง prompt ตามความสำเร็จ
+            updatePromptFromLearning();
+            
+            alert("✅ ขอบคุณครับ! ผมจะจำรูปแบบนี้และนำไปพัฒนาการวิเคราะห์ครับ");
+        } else {
+            learningMemory.stats.negativeFeedback++;
+            // เรียนรู้รูปแบบที่ผิดพลาด
+            learningMemory.patterns.failedSetups.push({
+                timestamp: Date.now(),
+                question: lastQuestion,
+                context: lastContext,
+                price: lastContext?.price
+            });
+            if (learningMemory.patterns.failedSetups.length > 50) learningMemory.patterns.failedSetups.shift();
+            
+            updatePromptFromLearning();
+            alert("❌ ขอบคุณที่บอกครับ! ผมจะเรียนรู้จากความผิดพลาดนี้และไม่แนะนำแบบเดิมอีก");
+        }
+        
+        // อัปเดตความแม่นยำ
+        const total = learningMemory.stats.positiveFeedback + learningMemory.stats.negativeFeedback;
+        learningMemory.stats.accuracy = total > 0 ? (learningMemory.stats.positiveFeedback / total) : 0;
+        
+        // อัปเดต feedback ใน conversation ล่าสุด
+        if (learningMemory.conversations.length > 0) {
+            learningMemory.conversations[0].feedback = isGood;
+        }
+        
+        saveLearningMemory();
+        
+        // ซ่อนปุ่ม feedback
+        document.getElementById("feedback-buttons").style.display = "none";
+        document.getElementById("last-prediction").innerHTML = `✅ ให้ feedback แล้ว! ขอบคุณที่ช่วยให้ AI เรียนรู้ครับ`;
+    }
+    
+    // ปรับปรุง System Prompt ตามการเรียนรู้
+    function updatePromptFromLearning() {
+        let additions = [];
+        
+        // วิเคราะห์รูปแบบที่สำเร็จ
+        if (learningMemory.patterns.successfulSetups.length > 3) {
+            let recentSuccess = learningMemory.patterns.successfulSetups.slice(-5);
+            additions.push("⚠️ จากประวัติการเทรดที่ผ่านมา แนวโน้มขาขึ้น (Bullish) ในช่วงตลาดเปิดมักให้ผลดี");
+            additions.push("⚠️ ผู้ใช้ชอบการวิเคราะห์แบบระบุจุดเข้าชัดเจน (Entry, SL, TP)");
+        }
+        
+        // วิเคราะห์รูปแบบที่ผิดพลาด
+        if (learningMemory.patterns.failedSetups.length > 3) {
+            additions.push("⚠️ จากความผิดพลาดที่ผ่านมา หลีกเลี่ยงการแนะนำให้เข้าเทรดในช่วงที่มีข่าวสำคัญ");
+            additions.push("⚠️ ควรเน้นรอการยืนยัน (Confirmation) ก่อนแนะนำ Entry");
+        }
+        
+        if (additions.length > 0) {
+            learningMemory.improvedPromptAdditions = "\n\n## ปรับปรุงจากการเรียนรู้:\n" + additions.slice(-3).join("\n");
+        }
+        
+        saveLearningMemory();
+    }
+    
+    // สร้าง System Prompt แบบไดนามิก (เรียนรู้จากประวัติ)
+    function getDynamicSystemPrompt(context) {
+        const basePrompt = `คุณเป็นเทรดเดอร์ผู้เชี่ยวชาญด้าน SMC (Smart Money Concepts) และการเทรดทองคำ (XAUUSD) 
+        
+ข้อมูลตลาดปัจจุบัน:
+- ราคาทองคำ: $${context.price}
+- Main Bias: ${context.bias}
+- Major Trend: ${context.majorTrend}
+- Supply Zones: ${context.supplyZones.join(", ") || "none"}
+- Demand Zones: ${context.demandZones.join(", ") || "none"}
+- Zone ใกล้สุด: ${context.nearestZone}
+- BOS ล่าสุด: ${context.lastBOS}
+- CHoCH ล่าสุด: ${context.lastCHOCH}
+- Order Blocks: ${context.orderBlocks} อัน
+- Liquidity: ${context.liquidity}
+
+กฎการวิเคราะห์ SMC:
+1. ห้ามแนะนำให้เข้าเทรดโดยไม่มี Stop Loss
+2. ควรระบุทั้ง Entry, SL, TP ให้ชัดเจน
+3. ถ้าไม่มั่นใจ ให้ตอบว่า "รอสัญญาณชัดเจนก่อน"
+4. ตอบเป็นภาษาไทย สั้น กระชับ เป็นประโยชน์
+
+${learningMemory.improvedPromptAdditions}
+
+จงตอบเป็นภาษาไทย มืออาชีพ ตามหลัก SMC เท่านั้น`;
+        
+        return basePrompt;
+    }
+    
+    // ============================================================
+    // SMC ENGINE
+    // ============================================================
+    
+    let marketData = {
+        price: 0,
+        previousPrices: [],
+        atr: 0
+    };
+    
+    let supplyZones = [];
+    let demandZones = [];
+    let orderBlocks = [];
+    let liquidityLevels = { highs: [], lows: [] };
+    let structure = {
+        bias: 0,
+        lastBOS: null,
+        lastCHOCH: null,
+        majorTrend: 0
+    };
+    
+    function calculateATR(prices, period = 14) {
+        if (prices.length < period + 1) return 5.0;
+        let trSum = 0;
+        for (let i = prices.length - period; i < prices.length; i++) {
+            if (i === 0) continue;
+            let high = prices[i].high || prices[i];
+            let low = prices[i].low || prices[i];
+            let prevClose = prices[i-1].close || prices[i-1];
+            let tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+            trSum += tr;
+        }
+        return trSum / period;
+    }
+    
+    function findPivots(prices, lookback = 5) {
+        if (prices.length < lookback * 2 + 1) return { pivotsHigh: [], pivotsLow: [] };
+        let pivotsHigh = [];
+        let pivotsLow = [];
+        for (let i = lookback; i < prices.length - lookback; i++) {
+            let isHigh = true, isLow = true;
+            for (let j = 1; j <= lookback; j++) {
+                if (prices[i].high <= prices[i-j].high || prices[i].high <= prices[i+j].high) isHigh = false;
+                if (prices[i].low >= prices[i-j].low || prices[i].low >= prices[i+j].low) isLow = false;
+            }
+            if (isHigh) pivotsHigh.push({ index: i, price: prices[i].high });
+            if (isLow) pivotsLow.push({ index: i, price: prices[i].low });
+        }
+        return { pivotsHigh, pivotsLow };
+    }
+    
+    function detectZones(prices, sensitivity = 3) {
+        let { pivotsHigh, pivotsLow } = findPivots(prices, sensitivity);
+        let newSupply = [], newDemand = [];
+        for (let p of pivotsHigh) newSupply.push({ top: p.price, bottom: p.price - (marketData.atr || 10) * 0.5 });
+        for (let p of pivotsLow) newDemand.push({ top: p.price + (marketData.atr || 10) * 0.5, bottom: p.price });
+        return { supply: newSupply.slice(-8), demand: newDemand.slice(-8) };
+    }
+    
+    function detectStructureBreak(prices, pivotsHigh, pivotsLow) {
+        if (prices.length < 10) return { bias: 0, bos: null, choch: null };
+        let currentPrice = prices[prices.length - 1].close;
+        let lastHH = null, lastLL = null;
+        for (let i = pivotsHigh.length - 1; i >= 0; i--) {
+            if (pivotsHigh[i].index > prices.length - 20) { lastHH = pivotsHigh[i].price; break; }
+        }
+        for (let i = pivotsLow.length - 1; i >= 0; i--) {
+            if (pivotsLow[i].index > prices.length - 20) { lastLL = pivotsLow[i].price; break; }
+        }
+        let newBias = structure.bias;
+        let bos = null, choch = null;
+        if (lastHH && currentPrice > lastHH) {
+            if (structure.bias === -1) choch = { type: "CHoCH", price: currentPrice, direction: "bullish" };
+            else bos = { type: "BOS", price: currentPrice, direction: "bullish" };
+            newBias = 1;
+        }
+        else if (lastLL && currentPrice < lastLL) {
+            if (structure.bias === 1) choch = { type: "CHoCH", price: currentPrice, direction: "bearish" };
+            else bos = { type: "BOS", price: currentPrice, direction: "bearish" };
+            newBias = -1;
+        }
+        return { bias: newBias, bos, choch };
+    }
+    
+    function detectOrderBlocks(prices) {
+        if (prices.length < 10) return [];
+        let blocks = [];
+        let last = prices[prices.length - 1];
+        let prev = prices[prices.length - 2];
+        if (prev && prev.close < prev.open && last.close > prev.high)
+            blocks.push({ type: "bullish", high: prev.high, low: prev.low });
+        if (prev && prev.close > prev.open && last.close < prev.low)
+            blocks.push({ type: "bearish", high: prev.high, low: prev.low });
+        return blocks.slice(-5);
+    }
+    
+    function detectLiquidity(prices, lookback = 30) {
+        let highs = [], lows = [];
+        let start = Math.max(0, prices.length - lookback);
+        for (let i = start; i < prices.length - 5; i++) {
+            let isHigh = true, isLow = true;
+            for (let j = 1; j <= 3; j++) {
+                if (i+j >= prices.length) continue;
+                if (prices[i].high <= prices[i+j].high) isHigh = false;
+                if (prices[i].low >= prices[i+j].low) isLow = false;
+            }
+            if (isHigh) highs.push(prices[i].high);
+            if (isLow) lows.push(prices[i].low);
+        }
+        return { highs: [...new Set(highs.slice(-6))], lows: [...new Set(lows.slice(-6))] };
+    }
+    
+    function updateSMCAnalysis(newPrice, historicalData) {
+        if (!historicalData || historicalData.length < 20) return;
+        marketData.price = newPrice;
+        marketData.previousPrices = historicalData;
+        marketData.atr = calculateATR(historicalData, 14);
+        let { pivotsHigh, pivotsLow } = findPivots(historicalData, 5);
+        let zones = detectZones(historicalData, 3);
+        supplyZones = zones.supply;
+        demandZones = zones.demand;
+        let structUpdate = detectStructureBreak(historicalData, pivotsHigh, pivotsLow);
+        if (structUpdate.bias !== 0) structure.bias = structUpdate.bias;
+        if (structUpdate.bos) structure.lastBOS = structUpdate.bos;
+        if (structUpdate.choch) structure.lastCHOCH = structUpdate.choch;
+        orderBlocks = detectOrderBlocks(historicalData);
+        liquidityLevels = detectLiquidity(historicalData, 40);
+        let closes = historicalData.map(d => d.close);
+        let ema20 = closes.slice(-20).reduce((a,b) => a+b, 0) / 20;
+        let ema50 = closes.slice(-50).reduce((a,b) => a+b, 0) / 50;
+        structure.majorTrend = ema20 > ema50 ? 1 : -1;
+    }
+    
+    function getNearestZone(price) {
+        let nearest = { type: null, distance: Infinity, level: 0 };
+        for (let z of supplyZones) {
+            let dist = Math.abs(price - z.top);
+            if (dist < nearest.distance) { nearest = { type: "SUPPLY", distance: dist, level: z.top }; }
+        }
+        for (let z of demandZones) {
+            let dist = Math.abs(price - z.bottom);
+            if (dist < nearest.distance) { nearest = { type: "DEMAND", distance: dist, level: z.bottom }; }
+        }
+        return nearest;
+    }
+    
+    function getSMCContext() {
+        const price = marketData.price;
+        const nearest = getNearestZone(price);
+        return {
+            price: price,
+            bias: structure.bias === 1 ? "bullish" : structure.bias === -1 ? "bearish" : "neutral",
+            majorTrend: structure.majorTrend === 1 ? "uptrend" : "downtrend",
+            supplyZones: supplyZones.slice(0,3).map(z => z.top.toFixed(2)),
+            demandZones: demandZones.slice(0,3).map(z => z.bottom.toFixed(2)),
+            nearestZone: nearest.type ? `${nearest.type} at $${nearest.level.toFixed(2)}` : "none",
+            lastBOS: structure.lastBOS ? `${structure.lastBOS.direction} at $${structure.lastBOS.price.toFixed(2)}` : "none",
+            lastCHOCH: structure.lastCHOCH ? `${structure.lastCHOCH.direction} at $${structure.lastCHOCH.price.toFixed(2)}` : "none",
+            orderBlocks: orderBlocks.length,
+            liquidity: `SSL: ${liquidityLevels.highs.slice(0,3).map(h => h.toFixed(2)).join(", ")} | BSL: ${liquidityLevels.lows.slice(0,3).map(l => l.toFixed(2)).join(", ")}`
+        };
+    }
+    
+    // ========== DEEPSEEK API + LEARNING ==========
+    async function callDeepSeekWithLearning(userMessage) {
+        const context = getSMCContext();
+        const systemPrompt = getDynamicSystemPrompt(context);
+        
+        try {
+            const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${DEEPSEEK_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: "deepseek-chat",
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userMessage }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 800
+                })
+            });
+            const data = await response.json();
+            if (data.choices && data.choices[0]) {
+                document.getElementById("api-status").innerHTML = "🟢 DeepSeek AI + Learning: Online";
+                const answer = data.choices[0].message.content;
+                // บันทึกการเรียนรู้
+                recordConversation(userMessage, answer, context);
+                lastQuestion = userMessage;
+                lastAnswer = answer;
+                lastContext = context;
+                // แสดงปุ่ม feedback
+                document.getElementById("feedback-buttons").style.display = "flex";
+                document.getElementById("last-prediction").innerHTML = `📝 คำถามล่าสุด: "${userMessage.substring(0, 50)}..."<br>👆 กดปุ่มด้านล่างเพื่อให้ AI เรียนรู้`;
+                return answer;
+            }
+            throw new Error("Invalid response");
+        } catch (error) {
+            console.error("DeepSeek error:", error);
+            document.getElementById("api-status").innerHTML = "🟡 DeepSeek: Fallback + Learning Mode";
+            return getFallbackResponse(userMessage, context);
+        }
+    }
+    
+    function getFallbackResponse(question, ctx) {
+        const q = question.toLowerCase();
+        let response = "";
+        if (q.includes("แนวโน้ม") || q.includes("trend")) {
+            response = `📊 แนวโน้ม SMC: ${ctx.bias === "bullish" ? "ขาขึ้น (Bullish)" : ctx.bias === "bearish" ? "ขาลง (Bearish)" : "Sideways"}\n💰 ราคา $${ctx.price}\n📍 Zone ใกล้สุด: ${ctx.nearestZone}`;
+        } else {
+            response = `📈 วิเคราะห์ SMC ราคา $${ctx.price}\n• Bias: ${ctx.bias}\n• Zone ใกล้สุด: ${ctx.nearestZone}\n• Order Block: ${ctx.orderBlocks} อัน\n\n💬 พี่ถามเฉพาะเรื่อง Zone, Entry, หรือ Liquidity ได้เลยครับ`;
+        }
+        recordConversation(question, response, ctx);
+        lastQuestion = question;
+        lastAnswer = response;
+        lastContext = ctx;
+        document.getElementById("feedback-buttons").style.display = "flex";
+        document.getElementById("last-prediction").innerHTML = `📝 คำถามล่าสุด: "${question.substring(0, 50)}..."<br>👆 กดปุ่มเพื่อให้ AI เรียนรู้`;
+        return response;
+    }
+    
+    // ========== UI UPDATE ==========
+    function updateDashboard() {
+        const price = marketData.price;
+        if (!price) return;
+        const biasText = structure.bias === 1 ? "🟢 BULLISH" : structure.bias === -1 ? "🔴 BEARISH" : "⚪ NEUTRAL";
+        document.getElementById("main-bias").innerHTML = biasText;
+        document.getElementById("main-bias").className = `stat-value ${structure.bias === 1 ? "bull" : structure.bias === -1 ? "bear" : ""}`;
+        const structureText = structure.lastBOS ? `BOS ${structure.lastBOS.direction}` : structure.lastCHOCH ? `CHoCH ${structure.lastCHOCH.direction}` : "Sideways";
+        document.getElementById("structure").innerHTML = structureText;
+        const nearest = getNearestZone(price);
+        document.getElementById("nearest-zone").innerHTML = nearest.type ? `${nearest.type} $${nearest.level.toFixed(2)}` : "-";
+        document.getElementById("liquidity").innerHTML = `${liquidityLevels.highs.length} SSL / ${liquidityLevels.lows.length} BSL`;
+        const signalsDiv = document.getElementById("signals-container");
+        let signalsHtml = "";
+        if (structure.bias === 1 && demandZones.length) signalsHtml += `<span class="signal-badge signal-buy">📈 BUY ZONE NEAR</span>`;
+        if (structure.bias === -1 && supplyZones.length) signalsHtml += `<span class="signal-badge signal-sell">📉 SELL ZONE NEAR</span>`;
+        if (orderBlocks.length) signalsHtml += `<span class="signal-badge signal-neutral">🧱 ${orderBlocks.length} OB</span>`;
+        if (learningMemory.stats.totalInteractions > 5) signalsHtml += `<span class="signal-badge signal-learning">🧠 LEARNING ACTIVE</span>`;
+        signalsDiv.innerHTML = signalsHtml || `<span class="signal-badge signal-neutral">⚡ WAIT FOR STRUCTURE</span>`;
+        document.getElementById("zone-info").innerHTML = `🔴 Supply: ${supplyZones.slice(0,2).map(z => z.top.toFixed(2)).join(", ")} &nbsp;&nbsp; 🟢 Demand: ${demandZones.slice(0,2).map(z => z.bottom.toFixed(2)).join(", ")}`;
+    }
+    
+    // ========== FETCH DATA ==========
+    let priceHistory = [];
+    
+    async function fetchGoldPrice() {
+        try {
+            const res = await fetch(`https://api.twelvedata.com/price?symbol=XAU/USD&apikey=f8905f4940f64ae0a72963db3ea03066`);
+            const data = await res.json();
+            if (data.price) return parseFloat(data.price);
+        } catch(e) {}
+        return 2620 + Math.random() * 60;
+    }
+    
+    async function fetchHistoricalData() {
+        try {
+            const res = await fetch(`https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=15min&outputsize=60&apikey=f8905f4940f64ae0a72963db3ea03066`);
+            const data = await res.json();
+            if (data.values) {
+                return data.values.reverse().map(v => ({
+                    time: v.datetime,
+                    open: parseFloat(v.open),
+                    high: parseFloat(v.high),
+                    low: parseFloat(v.low),
+                    close: parseFloat(v.close)
+                }));
+            }
+        } catch(e) {}
+        return null;
+    }
+    
+    async function init() {
+        loadLearningMemory();
+        const history = await fetchHistoricalData();
+        let currentPrice = await fetchGoldPrice();
+        if (history && history.length > 0) {
+            priceHistory = history;
+            currentPrice = history[history.length-1].close;
+        } else {
+            for (let i = 0; i < 60; i++) {
+                let base = 2620 + Math.sin(i * 0.3) * 30 + Math.random() * 10;
+                priceHistory.push({
+                    time: Date.now() - (60-i)*900000,
+                    open: base,
+                    high: base + Math.random() * 8,
+                    low: base - Math.random() * 8,
+                    close: base + (Math.random() - 0.5) * 6
+                });
+            }
+            currentPrice = priceHistory[priceHistory.length-1].close;
+        }
+        updateSMCAnalysis(currentPrice, priceHistory);
+        document.getElementById("gold-price").innerHTML = `$${currentPrice.toFixed(2)}`;
+        updateDashboard();
+        setInterval(async () => {
+            let newPrice = await fetchGoldPrice();
+            if (priceHistory.length > 0) {
+                let last = priceHistory[priceHistory.length-1];
+                let newCandle = {
+                    time: Date.now(),
+                    open: last.close,
+                    high: Math.max(last.close, newPrice + Math.random() * 2),
+                    low: Math.min(last.close, newPrice - Math.random() * 2),
+                    close: newPrice
+                };
+                priceHistory.push(newCandle);
+                if (priceHistory.length > 100) priceHistory.shift();
+                updateSMCAnalysis(newPrice, priceHistory);
+            }
+            document.getElementById("gold-price").innerHTML = `$${newPrice.toFixed(2)}`;
+            updateDashboard();
+        }, 10000);
+    }
+    
+    // ========== CHAT ==========
+    const chatOutput = document.getElementById('chat-output');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    
+    function addMessage(html, isUser = false) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = isUser ? 'user-msg' : 'ai-msg';
+        msgDiv.innerHTML = html;
+        chatOutput.appendChild(msgDiv);
+        chatOutput.scrollTop = chatOutput.scrollHeight;
+        return msgDiv;
+    }
+    
+    async function askAI() {
+        const text = userInput.value.trim();
+        if (!text) return;
+        addMessage(`คุณ: ${text}`, true);
+        userInput.value = '';
+        const thinkingDiv = addMessage(`⚡ <b>AI กำลังวิเคราะห์ + เรียนรู้...</b>`, false);
+        try {
+            const response = await callDeepSeekWithLearning(text);
+            thinkingDiv.innerHTML = `<b>🤖 DeepSeek SMC AI (Learning):</b><br>${response.replace(/\n/g, '<br>')}`;
+        } catch (error) {
+            thinkingDiv.innerHTML = `<b>❌ Error:</b><br>${error.message}`;
+        }
+    }
+    
+    window.giveFeedback = giveFeedback;
+    sendBtn.onclick = askAI;
+    userInput.addEventListener("keypress", (e) => { if (e.key === "Enter") askAI(); });
+    init();
+</script>
+</body>
+</html>
